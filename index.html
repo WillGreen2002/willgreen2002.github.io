@@ -106,7 +106,7 @@
     margin-top:26px;min-height:270px}
   .molecule{display:block;width:100%;max-width:520px;height:150px;margin:0 auto -12px}
   .molecule line,.molecule polyline{stroke:var(--accent-soft);stroke-width:1.5;fill:none;transition:stroke .7s ease;
-    stroke-linecap:round;stroke-linejoin:round}
+    stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
   .molecule .bond{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);
     animation:draw .5s cubic-bezier(.3,.8,.4,1) var(--d) forwards}
   .molecule .coord{stroke-dasharray:3 3;opacity:.58}
@@ -238,7 +238,7 @@
 </main>
 
 <div class="scene" id="scene">
-  <svg class="molecule" id="mol" viewBox="0 0 260 140" aria-hidden="true"></svg>
+  <svg class="molecule" id="mol" viewBox="0 0 260 140" role="img" aria-labelledby="cap"></svg>
   <p class="caption" id="cap" role="status"></p>
   <svg class="pixels" id="pix" viewBox="0 -16 200 62" preserveAspectRatio="xMidYMax meet" shape-rendering="crispEdges" aria-hidden="true"></svg>
 </div>
@@ -541,6 +541,9 @@
 
   function drawMolecule(spec){
     while(mol.firstChild) mol.removeChild(mol.firstChild);
+    var title=el("title",{});
+    title.textContent=spec.name+" — "+spec.sub;
+    mol.appendChild(title);
     var g=el("g",{});
     mol.appendChild(g);
     spec.bonds.forEach(function(bd,i){
@@ -653,7 +656,7 @@
     drawMolecule(spec);
     pix.setAttribute("class","pixels ex-"+sc.exit);
     drawPixels(sc,i);
-    cap.textContent=spec.name+" · "+spec.sub;
+    cap.textContent=(i+1)+" / "+SCENES.length+" · "+spec.name+" · "+spec.sub;
     cap.style.animation="none";cap.offsetHeight;cap.style.animation="";
   }
 
@@ -690,7 +693,8 @@
   document.addEventListener("visibilitychange",function(){ if(document.hidden) setPaused(true); });
 
   btn.addEventListener("click",next);
-  idx=Math.floor(Math.random()*SCENES.length);
+  // Always begin at the first verified structure; the green button advances in order.
+  idx=0;
   show(idx);
 })();
 </script>
