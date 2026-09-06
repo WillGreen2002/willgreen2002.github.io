@@ -15,6 +15,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700&family=IBM+Plex+Sans:wght@300;400&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<script>
+(function(){
+  var mode="auto";
+  try{mode=localStorage.getItem("animation-mode")||"auto";}catch(e){}
+  if(!/^(auto|on|off)$/.test(mode))mode="auto";
+  document.documentElement.dataset.motion=mode;
+  document.documentElement.classList.toggle("reduced-motion",mode==="off"||(mode==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches));
+})();
+</script>
 <style>
   :root{
     --sumi:#1A1917;
@@ -168,19 +177,18 @@
                  to{transform:translateY(-2.6px);opacity:1}}
   .blink{animation:blink var(--dur) ease-in-out var(--ph) infinite alternate}
   @keyframes blink{0%,35%{opacity:.18}75%,100%{opacity:1}}
-  .glint{animation:glint var(--dur) ease-in-out var(--ph) infinite alternate}
+  .pixels rect:where(.glint){animation:pop .34s cubic-bezier(.2,1.4,.5,1) var(--d) forwards,glint var(--dur) ease-in-out calc(var(--d) + .34s) infinite alternate}
+  .motion-control{display:block;margin-top:14px;color:var(--muted);font:11px var(--mono)}
+  .motion-control select{margin-left:8px;padding:5px;background:var(--sumi);color:var(--bone);border:1px solid var(--muted);font:inherit}
+  html.reduced-motion .pixels rect:where(.glint){animation:none;opacity:1;transform:none}
   @keyframes glint{0%,55%{opacity:.45}100%{opacity:1}}
 
-  @media(prefers-reduced-motion:reduce){
-    .seam path,.molecule .bond{animation:none;stroke-dashoffset:0}
-    .molecule text,.caption,.pixels rect{animation:none;opacity:1;transform:none}
-    .out .pixels rect,.out .molecule .bond,.out .molecule text{animation:none;opacity:0}
-    .sway,.bob,.blink,.glint{animation:none}
-  }
+  html.reduced-motion .seam path,html.reduced-motion .molecule .bond{animation:none;stroke-dashoffset:0}html.reduced-motion .molecule text,html.reduced-motion .caption,html.reduced-motion .pixels rect{animation:none;opacity:1;transform:none}html.reduced-motion .out .pixels rect,html.reduced-motion .out .molecule .bond,html.reduced-motion .out .molecule text{animation:none;opacity:0}html.reduced-motion .sway,html.reduced-motion .bob,html.reduced-motion .blink,html.reduced-motion .glint{animation:none}
+  
   .caption{padding:0 18px;overflow-wrap:break-word}
   .bio-pixels{display:block;width:100%;max-width:720px;height:auto;aspect-ratio:320/90;margin:0 auto;object-fit:contain;image-rendering:pixelated;transition:opacity .7s ease,transform .7s ease}
   .out .bio-pixels{opacity:0;transform:translateY(8px)}
-  @media(prefers-reduced-motion:reduce){.bio-pixels{transition:none}}
+  html.reduced-motion .bio-pixels{transition:none}
   .molecule text{paint-order:stroke fill;stroke:var(--sumi);stroke-width:4.5px;stroke-linejoin:round;font-size:11px}
   .molecule .metal{font-size:14px;fill:var(--accent-soft);font-weight:500}
   .molecule .coord{stroke:var(--accent);stroke-dasharray:4 4;opacity:.75;animation:fadein .6s ease var(--d) both}
@@ -189,7 +197,7 @@
   .molecule.complex{max-width:520px;height:150px;aspect-ratio:auto;margin:0 auto -12px}
   .molecule.complex text{font-size:24px}
   .molecule.complex .metal{font-size:20px}
-  @media(prefers-reduced-motion:reduce){.molecule .stereo,.molecule .coord{animation:none;opacity:1}.out .molecule .stereo{opacity:0}}
+  html.reduced-motion .molecule .stereo,html.reduced-motion .molecule .coord{animation:none;opacity:1}html.reduced-motion .out .molecule .stereo{opacity:0}
   .molecule-zoom{pointer-events:auto;margin:0 auto 16px;background:transparent;border:0;border-bottom:1px solid var(--accent);color:var(--accent-soft);font:12px var(--mono);padding:7px 3px;cursor:pointer}
   #structure-dialog{width:min(96vw,1120px);max-width:96vw;max-height:90vh;background:var(--sumi);color:var(--bone);border:1px solid var(--accent);padding:20px;overflow:auto}
   #structure-dialog::backdrop{background:#000b}
@@ -258,6 +266,9 @@
   <button class="greenbtn" id="btn" aria-describedby="cap">
     <span class="swatch" id="sw" aria-hidden="true"></span>green
   </button>
+  <label class="motion-control" for="animation-mode">Animations
+    <select id="animation-mode"><option value="auto">Auto (system)</option><option value="on">On</option><option value="off">Off</option></select>
+  </label>
 </main>
 
 <div class="scene" id="scene">
@@ -855,7 +866,7 @@
   function startBio(mode){
     var cv=document.getElementById("bio-pixels");bioCtx=cv.getContext("2d");
     bioElapsed=0;bioLast=0;bioPaint=mode==="xylindein"?drawWood:drawSwarm;
-    if(bioReduced.matches){bioPaint(mode==="xylindein"?25:5);return;}
+    if(document.documentElement.classList.contains("reduced-motion")){bioPaint(mode==="xylindein"?25:5);return;}
     bioPaint(0);
     function tick(now){
       if(!scene.classList.contains("paused")&&!document.hidden&&!scene.classList.contains("out")){
@@ -868,8 +879,18 @@
     }
     bioFrame=requestAnimationFrame(tick);
   }
-  bioReduced.addEventListener("change",function(){
+  var motionControl=document.getElementById("animation-mode");
+  motionControl.value=document.documentElement.dataset.motion;
+  function syncMotion(){
+    var mode=motionControl.value;
+    document.documentElement.dataset.motion=mode;
+    document.documentElement.classList.toggle("reduced-motion",mode==="off"||(mode==="auto"&&bioReduced.matches));
     if(idx>=0&&SCENES[idx].live){stopBio();startBio(SCENES[idx].live);}
+  }
+  bioReduced.addEventListener("change",syncMotion);
+  motionControl.addEventListener("change",function(){
+    try{localStorage.setItem("animation-mode",motionControl.value);}catch(e){}
+    syncMotion();
   });
 
   function show(i){
