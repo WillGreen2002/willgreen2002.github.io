@@ -15,15 +15,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700&family=IBM+Plex+Sans:wght@300;400&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
-<script>
-(function(){
-  var mode="auto";
-  try{mode=localStorage.getItem("animation-mode")||"auto";}catch(e){}
-  if(!/^(auto|on|off)$/.test(mode))mode="auto";
-  document.documentElement.dataset.motion=mode;
-  document.documentElement.classList.toggle("reduced-motion",mode==="off"||(mode==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches));
-})();
-</script>
 <style>
   :root{
     --sumi:#1A1917;
@@ -178,8 +169,6 @@
   .blink{animation:blink var(--dur) ease-in-out var(--ph) infinite alternate}
   @keyframes blink{0%,35%{opacity:.18}75%,100%{opacity:1}}
   .pixels rect:where(.glint){animation:pop .34s cubic-bezier(.2,1.4,.5,1) var(--d) forwards,glint var(--dur) ease-in-out calc(var(--d) + .34s) infinite alternate}
-  .motion-control{display:block;margin-top:14px;color:var(--muted);font:11px var(--mono)}
-  .motion-control select{margin-left:8px;padding:5px;background:var(--sumi);color:var(--bone);border:1px solid var(--muted);font:inherit}
   html.reduced-motion .pixels rect:where(.glint){animation:none;opacity:1;transform:none}
   @keyframes glint{0%,55%{opacity:.45}100%{opacity:1}}
 
@@ -266,9 +255,6 @@
   <button class="greenbtn" id="btn" aria-describedby="cap">
     <span class="swatch" id="sw" aria-hidden="true"></span>green
   </button>
-  <label class="motion-control" for="animation-mode">Animations
-    <select id="animation-mode"><option value="auto">Auto (system)</option><option value="on">On</option><option value="off">Off</option></select>
-  </label>
 </main>
 
 <div class="scene" id="scene">
@@ -764,7 +750,6 @@
   // The carriers represent whole pyoverdines. Fe(III) is chelated extracellularly;
   // reduction to Fe(II) and release occur after delivery to the cell (FpvG pathway).
   var bioFrame=0,bioElapsed=0,bioLast=0;
-  var bioReduced=window.matchMedia("(prefers-reduced-motion: reduce)");
   var BIO_CELL=["..222222..",".23444432.","2343333432","2432323342","2343333432",".23333332.","..222222.."];
   var BIO_CELLS=[
     {x:42,y:29,k:1.35,p:0,target:[72,73]},
@@ -777,11 +762,17 @@
   ];
   var bioPaint=null,bioCtx=null;
   function stopBio(){if(bioFrame)cancelAnimationFrame(bioFrame);bioFrame=0;}
-  function bioPixel(x,y,w,h,c){bioCtx.fillStyle=c;bioCtx.fillRect(Math.round(x),Math.round(y),Math.max(1,Math.round(w)),Math.max(1,Math.round(h)));}
+  function bioPixel(x,y,w,h,c){
+    // Shared edges prevent dark seams when sprites use fractional scales.
+    function edge(v){return Math.round(v+1e-9);}
+    var left=edge(x),top=edge(y);
+    bioCtx.fillStyle=c;
+    bioCtx.fillRect(left,top,Math.max(1,edge(x+w)-left),Math.max(1,edge(y+h)-top));
+  }
   function bioSprite(rows,x,y,pal,k,ky){
     ky=ky||k;
     rows.forEach(function(row,j){Array.from(row).forEach(function(c,i){
-      if(pal[c])bioPixel(x+i*k,y+j*ky,k+.2,ky+.2,pal[c]);
+      if(pal[c])bioPixel(x+i*k,y+j*ky,k,ky,pal[c]);
     });});
   }
   function drawSwarm(seconds){
@@ -854,7 +845,7 @@
         var threshold=Math.min(1,d*.8+((i*17+j*31)%13)/70);
         if(threshold>spread)c=(i+j)%6===0?"8":"7";
       }
-      bioPixel(left+i*k,top+j*2.6,k+.2,2.8,pal[c]);
+      bioPixel(left+i*k,top+j*2.6,k,2.6,pal[c]);
     });});
     XYL_GROWTH_CUPS.forEach(function(c,i){
       var g=Math.min(1,Math.max(0,(seconds-c.delay)/19));g=1-Math.pow(1-g,2);
@@ -866,7 +857,6 @@
   function startBio(mode){
     var cv=document.getElementById("bio-pixels");bioCtx=cv.getContext("2d");
     bioElapsed=0;bioLast=0;bioPaint=mode==="xylindein"?drawWood:drawSwarm;
-    if(document.documentElement.classList.contains("reduced-motion")){bioPaint(mode==="xylindein"?25:5);return;}
     bioPaint(0);
     function tick(now){
       if(!scene.classList.contains("paused")&&!document.hidden&&!scene.classList.contains("out")){
@@ -879,20 +869,6 @@
     }
     bioFrame=requestAnimationFrame(tick);
   }
-  var motionControl=document.getElementById("animation-mode");
-  motionControl.value=document.documentElement.dataset.motion;
-  function syncMotion(){
-    var mode=motionControl.value;
-    document.documentElement.dataset.motion=mode;
-    document.documentElement.classList.toggle("reduced-motion",mode==="off"||(mode==="auto"&&bioReduced.matches));
-    if(idx>=0&&SCENES[idx].live){stopBio();startBio(SCENES[idx].live);}
-  }
-  bioReduced.addEventListener("change",syncMotion);
-  motionControl.addEventListener("change",function(){
-    try{localStorage.setItem("animation-mode",motionControl.value);}catch(e){}
-    syncMotion();
-  });
-
   function show(i){
     stopBio();
     var sc=SCENES[i],spec=sc.build();
